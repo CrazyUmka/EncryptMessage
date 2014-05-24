@@ -1,8 +1,9 @@
 __author__ = 'Grigory'
-#coding:UTF-8
+#coding:utf8
 import os
 from Crypto.Cipher import AES
 import base64
+from pksc7 import PKCS7Encoder
 
 
 class DecryptError(Exception):
@@ -23,31 +24,50 @@ class Encryptions(object):
         file_load.close()
         index = data_file.rfind(u'_') + 1
         if index == 1:
-            raise DecryptError(u'Файд не возможно расшифровать, проверьте его целостность!')
+            raise DecryptError(u'Файл не возможно расшифровать, проверьте его целостность!')
         size_file = int(data_file [index : ])
         message = data_file [size_file : index - 1]
         message_decrypt = Encryptions.run_aes(name_file, message, u'Decode')
         print u'Расшифрованно новое сообщение:\n\t' + message_decrypt
 
     @staticmethod
-    def run_aes(key, text=u'', type_aes=u'Encode'):
+    def run_aes(key, text=u'', user_IV=u'magic_great_dead_or_alive', type_aes=u'Encode'):
+
         block_size = 32
-        padding = u'{'
-        Pad = lambda s: s + (block_size - len(s) % block_size) * padding
-        EncodeAES = lambda c, s: base64.b64encode(c.encrypt(Pad(s)))
-        DecodeAES = lambda c, e: c.decrypt(base64.b64decode(e)).rstrip(padding)
-        magic_uni = u'magic_great_dead_or_alive'
-        if len(key) < 32:
-            ostatok = 32 - len(key)
-            temp_str = magic_uni[:ostatok]
-            for i in temp_str:
-                key += i
-        secret = key
-        chiper = AES.new(secret)
+        password = ""
+        IV = ""
+
+        # padding = '{'
+        # Pad = lambda s: s + (block_size - len(s) % block_size) * padding
+        # EncodeAES = lambda c, s: base64.b64encode(c.encrypt(Pad(s)))
+        # DecodeAES = lambda c, e: c.decrypt(base64.b64decode(e)).rstrip(padding)
+        Pad = lambda s: PKCS7Encoder().encode(s)
+
+        if len(key) != 32:
+            while True:
+                password += key
+                if len(password) > 32:
+                    password = password[:32]
+                    break
+
+        if len(user_IV) != 16:
+            while True:
+                IV += user_IV
+                if len(IV) > 16:
+                    IV = IV[:16]
+                    break
+
+        encoder = PKCS7Encoder()
+        chiper = AES.new(password, AES.MODE_CBC, IV)
         if type_aes in u'Encode':
-            return EncodeAES(chiper, text)
+            # return EncodeAES(chiper, text)
+            encode_text = encoder.encode(text)
+            return base64.b64encode(chiper.encrypt(encode_text))
         else:
-            return DecodeAES(chiper, text)
+
+            result = chiper.decrypt(base64.b64decode(text))
+            return encoder.decode(result)
+            # return DecodeAES(chiper, text)
 
 
 class JpegDecode(Encryptions):
@@ -92,4 +112,7 @@ class Mp3Decode(Encryptions):
 
 
 if __name__ in '__main__':
-    PicDecoder = JpegDecode()
+    result = Encryptions.run_aes('12345',
+                                 'Привет',
+                                 )
+    print result
